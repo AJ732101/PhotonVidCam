@@ -245,14 +245,6 @@ public class VendorTagUtils {
                         }
                     }
 
-                    var algoHdrMode = new CaptureRequest.Key<>("com.xiaomi.algo.hdrMode", byte.class);
-                    if (isSupported(builder, algoHdrMode)) {
-                        PhotonCamera.hasXiaomiHdr = true;
-                        if (PhotonCamera.isHdrOn) {
-                            builder.set(algoHdrMode, (byte) PhotonCamera.getSpecific().specificSetting.xiaomiHdrMode);
-                        }
-                    }
-
                     var xiaomiSuperResRaw = new CaptureRequest.Key<>("xiaomi.superResolution.rawEnabled", byte.class);
                     if (isSupported(builder, xiaomiSuperResRaw)) {
                         if (PhotonCamera.isSuperResOn) {
@@ -264,6 +256,14 @@ public class VendorTagUtils {
                     if (isSupported(builder, xiaomiIszQuadRaw)) {
                         if (PhotonCamera.isSuperResOn) {
                             builder.set(xiaomiIszQuadRaw, (byte) 1);
+                        }
+                    }
+
+                    var algoHdrMode = new CaptureRequest.Key<>("com.xiaomi.algo.hdrMode", byte.class);
+                    if (isSupported(builder, algoHdrMode)) {
+                        PhotonCamera.hasXiaomiHdr = true;
+                        if (PhotonCamera.isHdrOn) {
+                            builder.set(algoHdrMode, (byte) PhotonCamera.getSpecific().specificSetting.xiaomiHdrMode);
                         }
                     }
 

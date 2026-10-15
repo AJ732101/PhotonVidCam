@@ -674,7 +674,7 @@ public class SettingsActivity extends BaseActivity implements
                 if (lutDir.exists() && lutDir.isDirectory()) {
                     File[] files = lutDir.listFiles((dir, name) -> {
                         String lowerName = name.toLowerCase();
-                        return lowerName.endsWith("_lut.png") || lowerName.endsWith(".cube");
+                        return lowerName.endsWith(".png") || lowerName.endsWith(".cube");
                     });
 
                     if (files != null) {
