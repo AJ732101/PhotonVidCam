@@ -44,7 +44,7 @@ public class YUVSaver extends DefaultSaver{
             Log.d(TAG, "DataSpace: " + String.valueOf(image.getDataSpace()));
         }
         // Check for 10-bit YUV format to encode as HEIC
-        if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) && ((image.getFormat() == ImageFormat.YCBCR_P010) || (image.getFormat() == ImageFormat.YUV_420_888))) {
+        if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) && ((image.getFormat() == ImageFormat.YCBCR_P010) || (image.getFormat() == ImageFormat.YUV_420_888) || (image.getFormat() == ImageFormat.PRIVATE))) {
             String usedCodec = PhotonCamera.getSettings().photoVideoCodec; //PhotonCamera.getSettings().tenBitSurfaceTarget;
             int usedTargetFormat = PhotonCamera.getSettings().previewFormat;
             Log.d(TAG, "YCBCR_P010 format detected, attempting to save via MediaCodec or YCBCR_P010 RAW");
@@ -94,6 +94,14 @@ public class YUVSaver extends DefaultSaver{
                     case ImageFormat.YUV_420_888:
                         try {
                             originalBitmap = ImageUtils.yuv8BitToBitmap(image);
+                        }
+                        catch (Exception e) {
+                            Log.e(TAG, Log.getStackTraceString(e));
+                        }
+                        break;
+                    case ImageFormat.PRIVATE:
+                        try {
+                            originalBitmap = ImageUtils.privateBitToBitmap(image);
                         }
                         catch (Exception e) {
                             Log.e(TAG, Log.getStackTraceString(e));

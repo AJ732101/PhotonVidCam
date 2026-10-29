@@ -141,6 +141,8 @@ public class SettingsActivity extends BaseActivity implements
                 entriesPrev.add("YCBCR_P010");
                 entryPrevValues.add("54");
             }
+            entriesPrev.add("PRIVATE");
+            entryPrevValues.add("34");
 
             prevPreference.setEntries(entriesPrev.toArray(new CharSequence[0]));
             prevPreference.setEntryValues(entryPrevValues.toArray(new CharSequence[0]));

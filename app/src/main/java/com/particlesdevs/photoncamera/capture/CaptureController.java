@@ -915,6 +915,8 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
             mPreviewTargetFormat = ImageFormat.YUV_420_888;
         } else if (PhotonCamera.getSettings().previewFormat == ImageFormat.YCBCR_P010) {
             mPreviewTargetFormat = ImageFormat.YCBCR_P010;
+        } else if (PhotonCamera.getSettings().previewFormat == ImageFormat.PRIVATE) {
+            mPreviewTargetFormat = ImageFormat.PRIVATE;
         }
     }
 
@@ -1691,6 +1693,8 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
                         flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
                     }
+                }else if (mTargetFormat == ImageFormat.PRIVATE) {
+                    flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
                 }
                 mImageReaderRaw = new ImageReader.Builder(targetWidth, targetHeight)
                         .setMaxImages(maxImageReaderImages)
@@ -3056,7 +3060,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
             mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
         } else {
             if (PhotonCamera.getSettings().useAlternatePreviewTemplate) {
-                mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             }
             else {
                 mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -3117,7 +3121,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
         // electronic stabilization for video if turned on
         if (PhotonCamera.getSettings().selectedMode.equals(CameraMode.VIDEO) && PreferenceKeys.isEisPhotoOn()) {
             // QualityDoesMatter
-            if (PhotonCamera.getSettings().videoEisInPreview) {
+            if (PhotonCamera.getSettings().videoEisInPreview && !mIsRecordingVideo) {
                 mPreviewRequestBuilder.set(CONTROL_VIDEO_STABILIZATION_MODE, CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION);
             }
             else {

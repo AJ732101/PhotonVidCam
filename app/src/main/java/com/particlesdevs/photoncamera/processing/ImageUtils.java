@@ -1,23 +1,37 @@
 package com.particlesdevs.photoncamera.processing;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
+import android.graphics.ColorSpace;
+import android.graphics.HardwareRenderer;
 import android.graphics.ImageFormat;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.RecordingCanvas;
+import android.graphics.RenderNode;
+import android.graphics.Shader;
+import android.hardware.HardwareBuffer;
 import android.media.Image;
+import android.media.ImageReader;
 import android.os.Build;
+import android.os.ConditionVariable;
+import android.os.Handler;
+import android.os.HandlerThread;
 import androidx.annotation.RequiresApi;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import com.particlesdevs.photoncamera.ui.camera.views.viewfinder.MainRenderer;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import com.particlesdevs.photoncamera.util.Log;
 
 /**
  * Utility class for Image conversions.
  * Contains methods for 8-bit SDR and 10-bit SDR/HDR data.
  */
 public class ImageUtils {
+
+    private static final String TAG = "ImageUtils";
 
     // Constants for HLG EOTF (Electro-Optical Transfer Function)
     private static final float HLG_A = 0.17883277f;
@@ -244,6 +258,106 @@ public class ImageUtils {
         Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         bmp.setPixels(argb, 0, width, 0, 0, width, height);
         return bmp;
+    }
+
+    /**
+     * Converts a PRIVATE (8/10-bit) Image to a standard RGBA_F16 Bitmap.
+     * Expects an Image originating from an ImageReader created with HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE.
+     * Uses HardwareRenderer + BitmapShader to sample the PRIVATE texture on GPU.
+     */
+    public static Bitmap privateBitToBitmap(Image image) {
+        if (image.getFormat() != ImageFormat.PRIVATE) {
+            throw new IllegalArgumentException("Image must be in PRIVATE format");
+        }
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        HardwareBuffer inputBuffer = image.getHardwareBuffer();
+        if (inputBuffer == null) {
+            throw new IllegalArgumentException("HardwareBuffer is null for PRIVATE Image");
+        }
+
+        Bitmap inputHardwareBitmap = null;
+        ImageReader outputReader = null;
+        HandlerThread callbackThread = null;
+        HardwareRenderer renderer = null;
+
+        try {
+            ColorSpace colorSpace = ColorSpace.get(ColorSpace.Named.SRGB);
+            inputHardwareBitmap = Bitmap.wrapHardwareBuffer(inputBuffer, colorSpace);
+            if (inputHardwareBitmap == null) {
+                throw new IllegalStateException("Failed to wrap input HardwareBuffer into Bitmap");
+            }
+
+            BitmapShader shader = new BitmapShader(inputHardwareBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+
+            Paint paint = new Paint();
+            paint.setShader(shader);
+            paint.setFilterBitmap(true);
+
+            RenderNode node = new RenderNode("PrivateBitToBitmapNode");
+            node.setPosition(0, 0, width, height);
+            RecordingCanvas recordingCanvas = node.beginRecording(width, height);
+            recordingCanvas.drawRect(0, 0, width, height, paint);
+            node.endRecording();
+
+            callbackThread = new HandlerThread("RenderThread");
+            callbackThread.start();
+            Handler callbackHandler = new Handler(callbackThread.getLooper());
+
+            long usageFlags = HardwareBuffer.USAGE_GPU_COLOR_OUTPUT
+                    | HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE
+                    | HardwareBuffer.USAGE_CPU_READ_OFTEN;
+
+            outputReader = ImageReader.newInstance(width, height, ImageFormat.PRIVATE, 1, usageFlags);
+
+            ConditionVariable frameAvailable = new ConditionVariable();
+            outputReader.setOnImageAvailableListener(reader -> frameAvailable.open(), callbackHandler);
+
+            renderer = new HardwareRenderer();
+            renderer.setSurface(outputReader.getSurface());
+            renderer.setContentRoot(node);
+            renderer.setOpaque(false);
+            renderer.createRenderRequest().syncAndDraw();
+
+            if (frameAvailable.block(3000)) {
+                try (Image resultImage = outputReader.acquireNextImage()) {
+                    if (resultImage != null) {
+                        try (HardwareBuffer outputHb = resultImage.getHardwareBuffer()) {
+                            if (outputHb != null) {
+                                Bitmap wrapped = Bitmap.wrapHardwareBuffer(outputHb, colorSpace);
+                                if (wrapped != null) {
+                                    Bitmap f16Bitmap = wrapped.copy(Bitmap.Config.RGBA_F16, true);
+                                    wrapped.recycle();
+                                    return f16Bitmap;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Log.e(TAG, "HardwareRenderer frame render timed out");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to render PRIVATE image to Bitmap: " + e.getMessage(), e);
+        } finally {
+            if (renderer != null) {
+                renderer.destroy();
+            }
+            if (outputReader != null) {
+                outputReader.close();
+            }
+            if (callbackThread != null) {
+                callbackThread.quitSafely();
+            }
+            if (inputHardwareBitmap != null) {
+                inputHardwareBitmap.recycle();
+            }
+            inputBuffer.close();
+        }
+
+        return null;
     }
 
     private static float hlgToLinear(float hlgValue) {

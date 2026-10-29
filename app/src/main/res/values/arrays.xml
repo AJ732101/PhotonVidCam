@@ -92,11 +92,13 @@
     <string-array name="real_preview_format_entries">
         <item>YUV_420_888</item>
         <item>YCBCR_P010</item>
+        <item>PRIVATE</item>
     </string-array>
 
     <string-array name="real_preview_format_entryValues">
         <item>35</item>
         <item>54</item>
+        <item>34</item>
     </string-array>
 
     <string-array name="raw_format_entries">
