@@ -162,6 +162,7 @@ public class Settings {
     public String customResolutionQb = "OFF";
     public int sensorModeDcgCropMode = 0;
     public boolean useFaceDetection = false;
+    public float gammaValue = 1.0f;
 
     public void loadCache() {
         noiseReduction = PreferenceKeys.isSystemNrOn();
@@ -185,6 +186,7 @@ public class Settings {
         contrastMpy = PreferenceKeys.getContrastValue();//TODO recheck
         saturation = PreferenceKeys.getSaturationValue();
         exposureCompensation = PreferenceKeys.getFloat(PreferenceKeys.Key.KEY_EXPOCOMPENSATE_SEEKBAR);
+        gammaValue = PreferenceKeys.getFloat(PreferenceKeys.Key.KEY_GAMMA_VALUE);
         compressor = PreferenceKeys.getCompressorValue();
         noiseRstr = PreferenceKeys.getFloat(PreferenceKeys.Key.KEY_NOISESTR_SEEKBAR);
         mergeStrength = PreferenceKeys.getFloat(PreferenceKeys.Key.KEY_MERGE_SEEKBAR);

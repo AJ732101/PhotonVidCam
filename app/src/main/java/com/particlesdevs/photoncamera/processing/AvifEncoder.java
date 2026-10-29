@@ -218,7 +218,8 @@ public class AvifEncoder {
                 }
             }
 
-            if (!targetSpace.equals(processedImage.getColorSpace())) {
+            ColorSpace sourceSpace = processedImage.getColorSpace();
+            if (!targetSpace.equals(sourceSpace)) {
                 Bitmap newBitmap = Bitmap.createBitmap(
                         processedImage.getWidth(),
                         processedImage.getHeight(),

@@ -7,6 +7,7 @@ uniform vec2 uCameraResolution;
 uniform bool enablePeak;
 uniform bool mirror;
 uniform bool binning;
+uniform float uGamma;
 
 out vec4 Output;
 in vec2 texCoord;
@@ -41,6 +42,7 @@ void main() {
         color = vec4(vec3(gray), 1.0);
     } else {
         color = texture(sTexture, uv);
+        color.rgb = pow(color.rgb, vec3(1.0 / uGamma));
     }
 
     // Edge highlighting (Focus Peaking)

@@ -1693,7 +1693,11 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
                         flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
                     }
-                }else if (mTargetFormat == ImageFormat.PRIVATE) {
+                } else if (mTargetFormat == ImageFormat.YUV_420_888) {
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                    }
+                } else if (mTargetFormat == ImageFormat.PRIVATE) {
                     flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
                 }
                 mImageReaderRaw = new ImageReader.Builder(targetWidth, targetHeight)
@@ -3763,7 +3767,11 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
     public CaptureRequest.Builder getDebugCaptureRequestBuilder(){
         final CaptureRequest.Builder captureBuilder;
         try {
-            captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            if (PhotonCamera.getSettings().useAlternatePreviewTemplate) {
+                captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            } else {
+                captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            }
             if (mTargetFormat != mPreviewTargetFormat)
                 captureBuilder.addTarget(mImageReaderRaw.getSurface());
             else
@@ -4341,7 +4349,11 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                 captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_ZERO_SHUTTER_LAG);
             }
             else {
-                captureBuilder =  mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                if (PhotonCamera.getSettings().useAlternatePreviewTemplate) {
+                    captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+                } else {
+                    captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                }
             }
             captureBuilder.addTarget(mImageReaderRaw.getSurface());
             int rotation = PhotonCamera.getGravity().getCameraRotation(mSensorOrientation);
@@ -4620,7 +4632,11 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                     captureBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, new Range<>(30, 30));
                 }
             } else {
-                captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                if (PhotonCamera.getSettings().useAlternatePreviewTemplate) {
+                    captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+                } else {
+                    captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                }
                 captureBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, new Range<>(30, 30));
             }
             float focus = mFocus;

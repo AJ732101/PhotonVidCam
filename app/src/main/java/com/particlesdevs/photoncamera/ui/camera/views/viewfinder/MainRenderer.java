@@ -71,6 +71,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
     private int uPostLutSize, uPostLutSizeTiles;
     private int uBinning_Normal;
     private int uCameraResolution_Normal;
+    private int uGamma_Normal;
     private int mScreenWidth;
     private int mScreenHeight;
     private int mCameraWidth = 1920;
@@ -181,6 +182,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             int isQuad = ((PhotonCamera.getSettings().sensorModeCfaPattern == -2) && PhotonCamera.isSensorModeOn) ? 1 : 0;
             GLES20.glUniform1i(uBinning_Normal, isQuad);
             GLES20.glUniform2f(uCameraResolution_Normal, (float) mCameraWidth, (float) mCameraHeight);
+            GLES20.glUniform1f(uGamma_Normal, PhotonCamera.getSettings().gammaValue);
         }
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, hTex[0]);
@@ -359,6 +361,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         resolutionLocation_Normal = GLES20.glGetUniformLocation(mNormalProgram, "resolution");
         uBinning_Normal = GLES20.glGetUniformLocation(mNormalProgram, "binning");
         uCameraResolution_Normal = GLES20.glGetUniformLocation(mNormalProgram, "uCameraResolution");
+        uGamma_Normal = GLES20.glGetUniformLocation(mNormalProgram, "uGamma");
 
         uTexRotateMatrix_Magnify = GLES20.glGetUniformLocation(mMagnifyProgram, "uTexRotateMatrix");
         uSTMatrix_Magnify = GLES20.glGetUniformLocation(mMagnifyProgram, "uSTMatrix");

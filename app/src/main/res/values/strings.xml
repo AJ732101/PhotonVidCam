@@ -12,6 +12,7 @@
     <string name="frame_count">HDR Frame Count</string>
     <string name="exposure_compensation">Exposure Compensation</string>
     <string name="contrast_curve_exposure_compensation">Global Exposure Compensation</string>
+    <string name="gamma_title">Gamma</string>
     <string name="color_temperature">Color Temperature</string>
     <string name="color_tint">Color Tint</string>
     <string name="single_frame_quality">Still Image Quality</string>

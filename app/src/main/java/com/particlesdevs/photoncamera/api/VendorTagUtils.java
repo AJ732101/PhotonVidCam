@@ -1,6 +1,7 @@
 package com.particlesdevs.photoncamera.api;
 
 import android.annotation.SuppressLint;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CaptureRequest;
 
 import com.particlesdevs.photoncamera.app.PhotonCamera;
@@ -673,7 +674,15 @@ public class VendorTagUtils {
                     }
                 }
 
-                noiseReduction(cameraCharacteristics, builder, isPreview);
+                if (PhotonCamera.getSettings().realPreviewFormat == ImageFormat.PRIVATE) {
+                    var useMfnr = new CaptureRequest.Key<>("org.codeaurora.qcamera3.sessionParameters.enableMFNR", Integer.class);
+                    if (isSupported(builder, useMfnr)) {
+                        PhotonCamera.hasMfnrKey = true;
+                        builder.set(useMfnr, PhotonCamera.getSettings().socQualcommUseMfnr ? 1 : 0);
+                    }
+                } else {
+                    noiseReduction(cameraCharacteristics, builder, isPreview);
+                }
 
                 // set all HDR parameter to 0
                 CaptureRequest.Key hdrMode = null;

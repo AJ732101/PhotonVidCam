@@ -328,6 +328,7 @@ public class PreferenceKeys {
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_CONTRAST_CURVE, resources.getString(R.string.pref_contrast_curve_default_value));
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_EFFECT_MODE, resources.getString(R.string.pref_effect_mode_default_value));
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_EXPOSURE_COMPENSATION, resources.getString(R.string.pref_exposure_compensation_default));
+        settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_GAMMA_VALUE, "1.0");
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_COLOR_TEMPERATURE, "999");
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_COLOR_TINT, "0.0");
         settingsManager.setInitial(SCOPE_GLOBAL, Key.KEY_SENSOR_MODE_DCG_16_10_CROP, resources.getString(R.string.pref_crop_default_value));
@@ -1148,6 +1149,10 @@ public class PreferenceKeys {
         return preferenceKeys.settingsManager.getInteger(SCOPE_GLOBAL, Key.KEY_EXPOSURE_COMPENSATION);
     }
 
+    public static float getGammaValue() {
+        return preferenceKeys.settingsManager.getFloat(SCOPE_GLOBAL, Key.KEY_GAMMA_VALUE);
+    }
+
     public static int getColorTemperature() {
         return preferenceKeys.settingsManager.getInteger(SCOPE_GLOBAL, Key.KEY_COLOR_TEMPERATURE);
     }
@@ -1381,6 +1386,7 @@ public class PreferenceKeys {
         KEY_DIGITAL_ZOOM_FACTOR(R.string.pref_digital_zoom_factor_key),
         KEY_CONTRAST_CURVE(R.string.pref_contrast_curve_key),
         KEY_EXPOSURE_COMPENSATION(R.string.pref_exposure_compensation_key),
+        KEY_GAMMA_VALUE(R.string.pref_gamma_key),
         KEY_COLOR_TEMPERATURE(R.string.pref_color_temperature_key),
         KEY_COLOR_TINT(R.string.pref_color_tint_key),
         KEY_EFFECT_MODE(R.string.pref_effect_mode_key),

@@ -2,6 +2,7 @@ package com.particlesdevs.photoncamera.processing;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
+import android.graphics.Canvas;
 import android.graphics.ColorSpace;
 import android.graphics.HardwareRenderer;
 import android.graphics.ImageFormat;
@@ -22,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+
+import com.particlesdevs.photoncamera.app.PhotonCamera;
 import com.particlesdevs.photoncamera.ui.camera.views.viewfinder.MainRenderer;
 import com.particlesdevs.photoncamera.util.Log;
 
@@ -215,58 +218,107 @@ public class ImageUtils {
 
     /**
      * Converts a YUV_420_888 (8-bit) Image to a standard ARGB_8888 Bitmap.
+     * Uses GPU HardwareBuffer acceleration on Android 9+ when available,
+     * and an allocation-free CPU fallback.
      */
     public static Bitmap yuv8BitToBitmap(Image image) {
-        // ... (This method remains the same as in the previous correct answer)
         if (image.getFormat() != ImageFormat.YUV_420_888) {
             throw new IllegalArgumentException("Image must be in YUV_420_888 format");
         }
+
+        if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+            return privateBitToBitmap(image);
+        }
+
         int width = image.getWidth();
         int height = image.getHeight();
         Image.Plane[] planes = image.getPlanes();
         Image.Plane yPlane = planes[0];
         Image.Plane uPlane = planes[1];
         Image.Plane vPlane = planes[2];
+
         ByteBuffer yBuffer = yPlane.getBuffer();
         ByteBuffer uBuffer = uPlane.getBuffer();
         ByteBuffer vBuffer = vPlane.getBuffer();
-        byte[] yData = new byte[yBuffer.remaining()];
-        byte[] uData = new byte[uBuffer.remaining()];
-        byte[] vData = new byte[vBuffer.remaining()];
-        yBuffer.get(yData);
-        uBuffer.get(uData);
-        vBuffer.get(vData);
-        int[] argb = new int[width * height];
+
         int yRowStride = yPlane.getRowStride();
         int uvRowStride = uPlane.getRowStride();
         int uvPixelStride = uPlane.getPixelStride();
+
+        int[] argb = new int[width * height];
+
         for (int j = 0; j < height; j++) {
+            int yRowOffset = j * yRowStride;
+            int uvRowOffset = (j / 2) * uvRowStride;
+
             for (int i = 0; i < width; i++) {
-                int y = (yData[j * yRowStride + i] & 0xFF);
-                int uvIndex = (j / 2) * uvRowStride + (i / 2) * uvPixelStride;
-                int u = (uData[uvIndex] & 0xFF) - 128;
-                int v = (vData[uvIndex] & 0xFF) - 128;
+                int y = yBuffer.get(yRowOffset + i) & 0xFF;
+                int uvIndex = uvRowOffset + (i / 2) * uvPixelStride;
+
+                int u = (uBuffer.get(uvIndex) & 0xFF) - 128;
+                int v = (vBuffer.get(uvIndex) & 0xFF) - 128;
+
                 int r = (int) (y + 1.402f * v);
                 int g = (int) (y - 0.344f * u - 0.714f * v);
                 int b = (int) (y + 1.772f * u);
+
                 r = Math.max(0, Math.min(255, r));
                 g = Math.max(0, Math.min(255, g));
                 b = Math.max(0, Math.min(255, b));
+
                 argb[j * width + i] = 0xFF000000 | (r << 16) | (g << 8) | b;
             }
         }
+
         Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         bmp.setPixels(argb, 0, width, 0, 0, width, height);
         return bmp;
     }
 
     /**
+     * Resolves the HardwareBuffer integer format to a human-readable string.
+     */
+    public static String getHardwareBufferFormatName(int format) {
+        // Check standard Android HardwareBuffer formats
+        switch (format) {
+            case HardwareBuffer.RGBA_8888:
+                return "RGBA_8888";
+            case HardwareBuffer.RGBX_8888:
+                return "RGBX_8888";
+            case HardwareBuffer.RGB_888:
+                return "RGB_888";
+            case HardwareBuffer.RGB_565:
+                return "RGB_565";
+            case HardwareBuffer.BLOB:
+                return "BLOB";
+            case HardwareBuffer.YCBCR_420_888:
+                return "YUV420";
+            default:
+                // Check for P010 (available from API 33 / Android 13 upwards)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && format == HardwareBuffer.YCBCR_P010) {
+                    return "P010";
+                }
+                if (format == 2141391878) {
+                    return "P010 (Vendor Encoded)";
+                }
+                if (format == 34) {
+                    return "??? (Vendor Encoded)";
+                }
+                if (format == 17) {
+                    return "HAL_PIXEL_FORMAT_YCrCb_420_SP (Vendor Encoded)";
+                }
+                // Fallback for vendor-specific or custom gralloc/HAL formats (e.g., 2141391878)
+                return "VENDOR_OR_CUSTOM_FORMAT";
+        }
+    }
+
+    /**
      * Converts a PRIVATE (8/10-bit) Image to a standard RGBA_F16 Bitmap.
      * Expects an Image originating from an ImageReader created with HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE.
-     * Uses HardwareRenderer + BitmapShader to sample the PRIVATE texture on GPU.
+     * Uses HardwareRenderer + BitmapShader to sample the PRIVATE texture on GPU, falling back to Canvas.
      */
     public static Bitmap privateBitToBitmap(Image image) {
-        if (image.getFormat() != ImageFormat.PRIVATE) {
+        if ((image.getFormat() != ImageFormat.PRIVATE) && (image.getFormat() != ImageFormat.YUV_420_888)) {
             throw new IllegalArgumentException("Image must be in PRIVATE format");
         }
 
@@ -278,13 +330,22 @@ public class ImageUtils {
             throw new IllegalArgumentException("HardwareBuffer is null for PRIVATE Image");
         }
 
+        int format = inputBuffer.getFormat();
+        String formatName = getHardwareBufferFormatName(format);
+        Log.d(TAG, "PRIVATE Capture Internal Buffer Format: " + format + " (" + formatName + ")");
+
         Bitmap inputHardwareBitmap = null;
         ImageReader outputReader = null;
         HandlerThread callbackThread = null;
         HardwareRenderer renderer = null;
 
         try {
-            ColorSpace colorSpace = ColorSpace.get(ColorSpace.Named.SRGB);
+            ColorSpace colorSpace = null;
+            if (image.getFormat() == ImageFormat.PRIVATE) {
+                ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB);
+            } else {
+                ColorSpace.get(ColorSpace.Named.SRGB);
+            }
             inputHardwareBitmap = Bitmap.wrapHardwareBuffer(inputBuffer, colorSpace);
             if (inputHardwareBitmap == null) {
                 throw new IllegalStateException("Failed to wrap input HardwareBuffer into Bitmap");
@@ -293,27 +354,67 @@ public class ImageUtils {
             BitmapShader shader = new BitmapShader(inputHardwareBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
 
             Paint paint = new Paint();
-            paint.setShader(shader);
             paint.setFilterBitmap(true);
+            float gamma = PhotonCamera.getSettings().gammaValue;
+            boolean swapRedBlue = image.getFormat() == ImageFormat.YUV_420_888 ? true : false;
+            if ((gamma != 1.0f || swapRedBlue) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                String agsl = "uniform shader image;\n" +
+                        "uniform float uGamma;\n" +
+                        "uniform int uSwapRedBlue;\n" + //
+                        "half4 main(float2 fragCoord) {\n" +
+                        "    half4 color = image.eval(fragCoord);\n" +
+                        "    if (uSwapRedBlue != 0) {\n" +
+                        "        color.rgb = color.bgr;\n" +
+                        "    }\n" +
+                        "    color.rgb = pow(color.rgb, half3(1.0 / uGamma));\n" +
+                        "    return color;\n" +
+                        "}";
+
+                android.graphics.RuntimeShader runtimeShader = new android.graphics.RuntimeShader(agsl);
+                runtimeShader.setInputShader("image", shader);
+                runtimeShader.setFloatUniform("uGamma", gamma);
+                runtimeShader.setIntUniform("uSwapRedBlue", swapRedBlue ? 1 : 0);
+
+                paint.setShader(runtimeShader);
+            } else {
+                paint.setShader(shader);
+            }
+
+            long usageFlags = HardwareBuffer.USAGE_GPU_COLOR_OUTPUT
+                    | HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE
+                    | HardwareBuffer.USAGE_CPU_READ_OFTEN;
+
+            try {
+                if (image.getFormat() == ImageFormat.PRIVATE) {
+                    outputReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_F16, 1, usageFlags);
+                } else {
+                    outputReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 1, usageFlags);
+                }
+            } catch (Exception e1) {
+                try {
+                    if (image.getFormat() == ImageFormat.PRIVATE) {
+                        outputReader = ImageReader.newInstance(width, height, ImageFormat.PRIVATE, 1, usageFlags);
+                    } else {
+                        outputReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 1, usageFlags);
+                    }
+                } catch (Exception e2) {
+                    Log.w(TAG, "ImageReader F16/PRIVATE initialization failed, falling back to Canvas rendering", e2);
+                    return renderToCanvas(shader, width, height);
+                }
+            }
+
+            callbackThread = new HandlerThread("RenderThread");
+            callbackThread.start();
+            Handler callbackHandler = new Handler(callbackThread.getLooper());
+
+            ConditionVariable frameAvailable = new ConditionVariable();
+            outputReader.setOnImageAvailableListener(reader -> frameAvailable.open(), callbackHandler);
 
             RenderNode node = new RenderNode("PrivateBitToBitmapNode");
             node.setPosition(0, 0, width, height);
             RecordingCanvas recordingCanvas = node.beginRecording(width, height);
             recordingCanvas.drawRect(0, 0, width, height, paint);
             node.endRecording();
-
-            callbackThread = new HandlerThread("RenderThread");
-            callbackThread.start();
-            Handler callbackHandler = new Handler(callbackThread.getLooper());
-
-            long usageFlags = HardwareBuffer.USAGE_GPU_COLOR_OUTPUT
-                    | HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE
-                    | HardwareBuffer.USAGE_CPU_READ_OFTEN;
-
-            outputReader = ImageReader.newInstance(width, height, ImageFormat.PRIVATE, 1, usageFlags);
-
-            ConditionVariable frameAvailable = new ConditionVariable();
-            outputReader.setOnImageAvailableListener(reader -> frameAvailable.open(), callbackHandler);
 
             renderer = new HardwareRenderer();
             renderer.setSurface(outputReader.getSurface());
@@ -328,7 +429,12 @@ public class ImageUtils {
                             if (outputHb != null) {
                                 Bitmap wrapped = Bitmap.wrapHardwareBuffer(outputHb, colorSpace);
                                 if (wrapped != null) {
-                                    Bitmap f16Bitmap = wrapped.copy(Bitmap.Config.RGBA_F16, true);
+                                    Bitmap f16Bitmap = null;
+                                    if (image.getFormat() == ImageFormat.PRIVATE) {
+                                        f16Bitmap = wrapped.copy(Bitmap.Config.RGBA_F16, true);
+                                    } else {
+                                        f16Bitmap = wrapped.copy(Bitmap.Config.ARGB_8888, true);
+                                    }
                                     wrapped.recycle();
                                     return f16Bitmap;
                                 }
@@ -337,10 +443,15 @@ public class ImageUtils {
                     }
                 }
             } else {
-                Log.e(TAG, "HardwareRenderer frame render timed out");
+                Log.w(TAG, "HardwareRenderer frame render timed out, falling back to Canvas rendering");
+                return renderToCanvas(shader, width, height);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to render PRIVATE image to Bitmap: " + e.getMessage(), e);
+            Log.e(TAG, "Hardware rendering failed, falling back to Canvas rendering: " + e.getMessage(), e);
+            if (inputHardwareBitmap != null) {
+                BitmapShader shader = new BitmapShader(inputHardwareBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                return renderToCanvas(shader, width, height);
+            }
         } finally {
             if (renderer != null) {
                 renderer.destroy();
@@ -358,6 +469,21 @@ public class ImageUtils {
         }
 
         return null;
+    }
+
+    private static Bitmap renderToCanvas(Shader shader, int width, int height) {
+        try {
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGBA_F16);
+            Canvas canvas = new Canvas(bmp);
+            Paint paint = new Paint();
+            paint.setShader(shader);
+            paint.setFilterBitmap(true);
+            canvas.drawRect(0, 0, width, height, paint);
+            return bmp;
+        } catch (Exception e) {
+            Log.e(TAG, "Canvas fallback rendering failed: " + e.getMessage(), e);
+            return null;
+        }
     }
 
     private static float hlgToLinear(float hlgValue) {

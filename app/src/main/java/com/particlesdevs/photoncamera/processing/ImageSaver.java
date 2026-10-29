@@ -352,7 +352,16 @@ public class ImageSaver {
             } else {
                 imageDescriptionBuilder.append("\n   LUT Name: None");
             }
-            imageDescriptionBuilder.append("\n   Input Format: ").append((PhotonCamera.getSettings().realPreviewFormat == ImageFormat.YUV_420_888) ? "YUV_420_888" : "YCBCR_P010");
+            String inputFormat = "YUV_420_888";
+            switch (PhotonCamera.getSettings().realPreviewFormat) {
+                case ImageFormat.YCBCR_P010:
+                    inputFormat = "YCBCR_P010";
+                    break;
+                case ImageFormat.PRIVATE:
+                    inputFormat = "PRIVATE";
+                    break;
+            }
+            imageDescriptionBuilder.append("\n   Input Format: ").append(inputFormat);
         }
         if ((!PhotonCamera.getSettings().contrastCurve.equalsIgnoreCase("off"))) {
             imageDescriptionBuilder.append("\n   Contrast Curve: ").append(PhotonCamera.getSettings().contrastCurve);
@@ -364,6 +373,7 @@ public class ImageSaver {
         imageDescriptionBuilder.append("\n   SoC Contrast: ").append(PhotonCamera.getSettings().socQualcommContrast);
         imageDescriptionBuilder.append("\n   SoC Sharpness: ").append(PhotonCamera.getSettings().socQualcommSharpness);
         imageDescriptionBuilder.append("\n   SoC LTM Control: ").append(PhotonCamera.getSettings().socQualcommLtmOff ? "Enabled" : "Disabled");
+        imageDescriptionBuilder.append("\n   SoC MFNR: ").append(PhotonCamera.getSettings().socQualcommUseMfnr ? "Enabled" : "Disabled");
         if (PhotonCamera.getSettings().socQualcommManualWb > 1500) {
             imageDescriptionBuilder.append("\n   SoC Temperature: ").append(PhotonCamera.getSettings().socQualcommManualWb).append("K");
         }

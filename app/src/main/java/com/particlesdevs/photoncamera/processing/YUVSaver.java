@@ -152,6 +152,14 @@ public class YUVSaver extends DefaultSaver{
                             Log.e(TAG, Log.getStackTraceString(e));
                         }
                         break;
+                    case ImageFormat.PRIVATE:
+                        try {
+                            originalBitmap = ImageUtils.privateBitToBitmap(image);
+                        }
+                        catch (Exception e) {
+                            Log.e(TAG, Log.getStackTraceString(e));
+                        }
+                        break;
                 }
                 AvifEncoder.saveBitmapToPng(originalBitmap, heicFile, quality);
                 ExifInterface inter = ParseExif.setAllAttributes(heicFile, ImageSaver.exifDataFromMetadata(metadata, orientation));
@@ -196,6 +204,14 @@ public class YUVSaver extends DefaultSaver{
                             Log.e(TAG, Log.getStackTraceString(e));
                         }
                         break;
+                    case ImageFormat.PRIVATE:
+                        try {
+                            originalBitmap = ImageUtils.privateBitToBitmap(image);
+                        }
+                        catch (Exception e) {
+                            Log.e(TAG, Log.getStackTraceString(e));
+                        }
+                        break;
                 }
 
                 if (usedTargetFormat == PhotonCamera.userFormatWebpLossySw) {
@@ -227,7 +243,14 @@ public class YUVSaver extends DefaultSaver{
                 heicFile = new File(storagePath.toString());
                 AvifEncoder avifEncoder = new AvifEncoder();
                 try {
-                    avifEncoder.encodeYuvToAvif(image, heicFile, orientation, quality, metadata, renderer);
+                    if (image.getFormat() == ImageFormat.PRIVATE) {
+                        ParseExif.ExifData exifData = ImageSaver.exifDataFromMetadata(metadata, orientation);
+                        Bitmap originalBitmap = ImageUtils.privateBitToBitmap(image);
+                        avifEncoder.encodeBmpToAvif(originalBitmap, heicFile, 0, PhotonCamera.getSettings().singleFrameQuality, null, exifData);
+                        originalBitmap.recycle();
+                    } else {
+                        avifEncoder.encodeYuvToAvif(image, heicFile, orientation, quality, metadata, renderer);
+                    }
                 }
                 catch (Exception e) {
                     Log.e(TAG, Log.getStackTraceString(e));
