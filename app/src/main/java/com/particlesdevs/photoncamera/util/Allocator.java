@@ -1,5 +1,6 @@
 package com.particlesdevs.photoncamera.util;
 
+import android.graphics.Bitmap;
 import java.nio.ByteBuffer;
 public class Allocator{
     static {
@@ -14,6 +15,8 @@ public class Allocator{
     public native static ByteBuffer allocateAndCopyConvert(int capacity, ByteBuffer origin, int width, int row_stride, int offset);
     public native static ByteBuffer allocateAndCopyConvertBinning(int capacity, ByteBuffer origin, int width, int row_stride, int offset);
     public native static ByteBuffer allocateAndCopyBinning(int capacity, ByteBuffer origin, int width, int height, int row_stride);
+
+    public native static boolean readPixelsToBitmap(Bitmap bitmap, int width, int height);
 
     public native static void free(ByteBuffer buffer);
     public native static long getMemoryCount();

@@ -21,6 +21,7 @@ import androidx.annotation.NonNull;
 import com.particlesdevs.photoncamera.app.PhotonCamera;
 import com.particlesdevs.photoncamera.processing.opengl.GLImage;
 import com.particlesdevs.photoncamera.processing.opengl.GLTexture;
+import com.particlesdevs.photoncamera.util.Allocator;
 import com.particlesdevs.photoncamera.util.Log;
 import com.particlesdevs.photoncamera.util.Utilities;
 
@@ -942,7 +943,12 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         final int sensorHeight = image.getHeight();
         final Image.Plane[] planes = image.getPlanes();
 
-        final ByteBuffer yBufferCopy = ByteBuffer.allocateDirect(planes[0].getBuffer().remaining());
+        final ByteBuffer yBufferCopy = Allocator.allocate(planes[0].getBuffer().remaining());
+        if (yBufferCopy == null) {
+            image.close();
+            onComplete.accept(null);
+            return;
+        }
         yBufferCopy.order(ByteOrder.LITTLE_ENDIAN);
         ByteBuffer ySrc = planes[0].getBuffer().duplicate();
         ySrc.position(0);
@@ -950,7 +956,13 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         yBufferCopy.rewind();
         final int yRowStride = planes[0].getRowStride();
 
-        final ByteBuffer uvBufferCopy = ByteBuffer.allocateDirect(planes[1].getBuffer().remaining());
+        final ByteBuffer uvBufferCopy = Allocator.allocate(planes[1].getBuffer().remaining());
+        if (uvBufferCopy == null) {
+            Allocator.free(yBufferCopy);
+            image.close();
+            onComplete.accept(null);
+            return;
+        }
         uvBufferCopy.order(ByteOrder.LITTLE_ENDIAN);
         ByteBuffer uvSrc = planes[1].getBuffer().duplicate();
         uvSrc.position(0);
@@ -962,6 +974,8 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
 
         mView.queueEvent(() -> {
             if (!PhotonCamera.getSettings().lutName.equals("lut.png") && (hTexLut == null)) {
+                Allocator.free(yBufferCopy);
+                Allocator.free(uvBufferCopy);
                 onComplete.accept(null);
                 return;
             }
@@ -975,6 +989,12 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             int[] yuvTextures = new int[2];
 
             try {
+                int[] maxTexSize = new int[1];
+                GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTexSize, 0);
+                if (mImageWidth > maxTexSize[0] || mImageHeight > maxTexSize[0]) {
+                    Log.e(TAG, "Image dimensions " + mImageWidth + "x" + mImageHeight + " exceed GL_MAX_TEXTURE_SIZE (" + maxTexSize[0] + ")");
+                }
+
                 setupGenericFramebuffer(fbo1, rbo1, tex1, mImageWidth, mImageHeight, true);
 
                 GLES20.glGenTextures(2, yuvTextures, 0);
@@ -1058,9 +1078,6 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 }
 
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, finalFbo);
-                ByteBuffer processedBuffer = ByteBuffer.allocateDirect(mImageWidth * mImageHeight * 8);
-                processedBuffer.order(ByteOrder.nativeOrder());
-                GLES20.glReadPixels(0, 0, mImageWidth, mImageHeight, GLES20.GL_RGBA, GLES30.GL_HALF_FLOAT, processedBuffer);
 
                 Bitmap resultBitmap = null;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -1104,11 +1121,19 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 } else {
                     resultBitmap = Bitmap.createBitmap(mImageWidth, mImageHeight, Bitmap.Config.RGBA_F16, true, ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB));
                 }
-                resultBitmap.copyPixelsFromBuffer(processedBuffer);
+
+                boolean readOk = Allocator.readPixelsToBitmap(resultBitmap, mImageWidth, mImageHeight);
+                if (!readOk) {
+                    Log.e(TAG, "readPixelsToBitmap failed for " + mImageWidth + "x" + mImageHeight);
+                    onComplete.accept(null);
+                    return;
+                }
 
                 onComplete.accept(resultBitmap);
 
             } finally {
+                Allocator.free(yBufferCopy);
+                Allocator.free(uvBufferCopy);
                 GLES20.glDeleteTextures(2, yuvTextures, 0);
                 GLES20.glDeleteTextures(1, tex1, 0);
                 GLES20.glDeleteTextures(1, tex2, 0);
@@ -1131,7 +1156,11 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         final int height = image.getHeight();
         final Image.Plane[] planes = image.getPlanes();
 
-        final ByteBuffer yBufferCopy = ByteBuffer.allocateDirect(planes[0].getBuffer().remaining());
+        final ByteBuffer yBufferCopy = Allocator.allocate(planes[0].getBuffer().remaining());
+        if (yBufferCopy == null) {
+            image.close();
+            throw new OutOfMemoryError("Failed to allocate yBufferCopy");
+        }
         yBufferCopy.order(ByteOrder.LITTLE_ENDIAN);
         ByteBuffer ySrc = planes[0].getBuffer().duplicate();
         ySrc.position(0);
@@ -1139,7 +1168,12 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         yBufferCopy.rewind();
         final int yRowStride = planes[0].getRowStride();
 
-        final ByteBuffer uvBufferCopy = ByteBuffer.allocateDirect(planes[1].getBuffer().remaining());
+        final ByteBuffer uvBufferCopy = Allocator.allocate(planes[1].getBuffer().remaining());
+        if (uvBufferCopy == null) {
+            Allocator.free(yBufferCopy);
+            image.close();
+            throw new OutOfMemoryError("Failed to allocate uvBufferCopy");
+        }
         uvBufferCopy.order(ByteOrder.LITTLE_ENDIAN);
         ByteBuffer uvSrc = planes[1].getBuffer().duplicate();
         uvSrc.position(0);
@@ -1194,18 +1228,19 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glEnableVertexAttribArray(mP010_vPosition);
                 GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
 
-                ByteBuffer processedBuffer = ByteBuffer.allocateDirect(width * height * 8);
-                processedBuffer.order(ByteOrder.nativeOrder());
-                GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES30.GL_HALF_FLOAT, processedBuffer);
-
                 Bitmap resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGBA_F16);
-                resultBitmap.copyPixelsFromBuffer(processedBuffer);
+                boolean readOk = Allocator.readPixelsToBitmap(resultBitmap, width, height);
+                if (!readOk) {
+                    throw new RuntimeException("readPixelsToBitmap failed for " + width + "x" + height);
+                }
 
                 return resultBitmap;
             } catch (Exception e) {
                 e.printStackTrace();
                 throw e;
             } finally {
+                Allocator.free(yBufferCopy);
+                Allocator.free(uvBufferCopy);
                 GLES20.glDeleteTextures(2, yuvTextures, 0);
                 GLES20.glDeleteFramebuffers(1, fboId, 0);
                 GLES20.glDeleteRenderbuffers(1, rboId, 0);

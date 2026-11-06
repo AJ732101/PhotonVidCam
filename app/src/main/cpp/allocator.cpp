@@ -5,6 +5,8 @@
 #include <jni.h>
 #include <malloc.h>
 #include <string.h>
+#include <android/bitmap.h>
+#include <GLES3/gl3.h>
 #include "android/log.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Allocator", __VA_ARGS__)
@@ -279,15 +281,27 @@ Java_com_particlesdevs_photoncamera_util_Allocator_free(JNIEnv *env, jclass claz
 
     // Get the address of the allocated memory
     void* ptr = env->GetDirectBufferAddress(buffer);
-    long capacity = env->GetDirectBufferCapacity(buffer);
     if (ptr == nullptr) {
-        LOGD("Failed to get direct buffer address");
+        LOGD("Buffer address is already null/freed, skipping free");
         return;
+    }
+
+    long capacity = env->GetDirectBufferCapacity(buffer);
+
+    // Clear the address field on Java Buffer object to prevent double-free
+    jclass bufferClass = env->GetObjectClass(buffer);
+    jfieldID addressField = env->GetFieldID(bufferClass, "address", "J");
+    if (addressField != nullptr) {
+        env->SetLongField(buffer, addressField, 0L);
+    } else {
+        env->ExceptionClear();
     }
 
     // Free the allocated memory
     free(ptr);
-    memoryCount -= capacity;
+    if (capacity > 0 && memoryCount >= capacity) {
+        memoryCount -= capacity;
+    }
     LOGD("Buffer freed successfully");
 }
 
@@ -297,4 +311,49 @@ Java_com_particlesdevs_photoncamera_util_Allocator_getMemoryCount(JNIEnv *env, j
     // Return the current memory count
     LOGD("Current memory count: %ld MB", (memoryCount/1024)/1024);
     return memoryCount;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_particlesdevs_photoncamera_util_Allocator_readPixelsToBitmap(JNIEnv *env, jclass clazz,
+                                                                      jobject bitmap, jint width, jint height) {
+    if (bitmap == nullptr || width <= 0 || height <= 0) {
+        LOGD("readPixelsToBitmap: invalid arguments");
+        return JNI_FALSE;
+    }
+
+    AndroidBitmapInfo info;
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) {
+        LOGD("readPixelsToBitmap: failed to get bitmap info");
+        return JNI_FALSE;
+    }
+
+    GLenum glType;
+    if (info.format == ANDROID_BITMAP_FORMAT_RGBA_F16) {
+        glType = GL_HALF_FLOAT;
+    } else if (info.format == ANDROID_BITMAP_FORMAT_RGBA_8888) {
+        glType = GL_UNSIGNED_BYTE;
+    } else {
+        LOGD("readPixelsToBitmap: unsupported bitmap format %d", info.format);
+        return JNI_FALSE;
+    }
+
+    void* pixels = nullptr;
+    int res = AndroidBitmap_lockPixels(env, bitmap, &pixels);
+    if (res != ANDROID_BITMAP_RESULT_SUCCESS || pixels == nullptr) {
+        LOGD("readPixelsToBitmap: failed to lock bitmap pixels, res=%d", res);
+        return JNI_FALSE;
+    }
+
+    const int stripHeight = 512;
+    uint8_t* ptr = static_cast<uint8_t*>(pixels);
+    size_t stride = info.stride;
+
+    for (int y = 0; y < height; y += stripHeight) {
+        int h = (y + stripHeight <= height) ? stripHeight : (height - y);
+        glReadPixels(0, y, width, h, GL_RGBA, glType, ptr + ((size_t)y * stride));
+    }
+
+    AndroidBitmap_unlockPixels(env, bitmap);
+    return JNI_TRUE;
 }
