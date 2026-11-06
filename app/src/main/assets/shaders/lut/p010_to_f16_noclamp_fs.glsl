@@ -6,6 +6,7 @@ in vec2 v_texCoord;
 
 uniform usampler2D y_texture;
 uniform usampler2D u_texture;
+uniform float uGamma;
 
 out vec4 FragColor;
 
@@ -26,5 +27,10 @@ void main() {
     float g = y_prime - 0.16455 * cb_prime - 0.57135 * cr_prime;
     float b = y_prime + 1.8814 * cb_prime;
 
-    FragColor = vec4(r, g, b, 1.0);
+    vec3 rgb = vec3(r, g, b);
+    if (uGamma > 0.0) {
+        rgb = pow(max(rgb, vec3(0.0)), vec3(1.0 / uGamma));
+    }
+
+    FragColor = vec4(rgb, 1.0);
 }

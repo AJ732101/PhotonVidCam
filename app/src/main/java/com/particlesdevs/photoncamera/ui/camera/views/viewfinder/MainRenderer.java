@@ -102,12 +102,14 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
     private int mP010_aTexCoord;
     private int mP010_Ytex, mP010_Utex, mP010_Vtex;
     private int uOffscreenTexRotateMatrixHandle_P010;
+    private int mP010_Gamma;
 
     private int mP010ToF16NoClampProgram;
     private int mP010NoClamp_vPosition;
     private int mP010NoClamp_aTexCoord;
     private int mP010NoClamp_Ytex, mP010NoClamp_Utex, mP010NoClamp_Vtex;
     private int uOffscreenTexRotateMatrixHandle_P010NoClamp;
+    private int mP010NoClamp_Gamma;
 
     private int mLutNoClampProgram;
     private int vPosition_LutNoClamp;
@@ -252,6 +254,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         mP010_Ytex = GLES20.glGetUniformLocation(mP010ToF16Program, "y_texture");
         mP010_Utex = GLES20.glGetUniformLocation(mP010ToF16Program, "u_texture");
         uOffscreenTexRotateMatrixHandle_P010 = GLES20.glGetUniformLocation(mP010ToF16Program, "uTexRotateMatrix");
+        mP010_Gamma = GLES20.glGetUniformLocation(mP010ToF16Program, "uGamma");
 
         mP010_Vtex = mP010_Utex;
 
@@ -290,6 +293,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         mP010NoClamp_Ytex = GLES20.glGetUniformLocation(mP010ToF16NoClampProgram, "y_texture");
         mP010NoClamp_Utex = GLES20.glGetUniformLocation(mP010ToF16NoClampProgram, "u_texture");
         uOffscreenTexRotateMatrixHandle_P010NoClamp = GLES20.glGetUniformLocation(mP010ToF16NoClampProgram, "uTexRotateMatrix");
+        mP010NoClamp_Gamma = GLES20.glGetUniformLocation(mP010ToF16NoClampProgram, "uGamma");
         mP010NoClamp_Vtex = mP010NoClamp_Utex;
 
         mSTexture = new SurfaceTexture(hTex[0]);
@@ -865,6 +869,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glUniform1i(mP010_Ytex, 0);
                 GLES20.glUniform1i(mP010_Utex, 1);
                 GLES20.glUniform1i(mP010_Vtex, 1);
+                GLES20.glUniform1f(mP010_Gamma, PhotonCamera.getSettings().gammaValue);
 
                 mOffscreenVertexBuffer.position(0);
                 GLES20.glVertexAttribPointer(mP010_vPosition, 2, GLES20.GL_FLOAT, false, 0, mOffscreenVertexBuffer);
@@ -1026,6 +1031,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glUniform1i(mP010NoClamp_Ytex, 0);
                 GLES20.glUniform1i(mP010NoClamp_Utex, 1);
                 GLES20.glUniform1i(mP010NoClamp_Vtex, 1);
+                GLES20.glUniform1f(mP010NoClamp_Gamma, PhotonCamera.getSettings().gammaValue);
 
                 mOffscreenVertexBuffer.position(0);
                 GLES20.glVertexAttribPointer(mP010NoClamp_vPosition, 2, GLES20.GL_FLOAT, false, 0, mOffscreenVertexBuffer);
@@ -1225,6 +1231,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glUniform1i(mP010_Ytex, 0);
                 GLES20.glUniform1i(mP010_Utex, 1);
                 GLES20.glUniform1i(mP010_Vtex, 1);
+                GLES20.glUniform1f(mP010_Gamma, PhotonCamera.getSettings().gammaValue);
 
                 mOffscreenVertexBuffer.position(0);
                 GLES20.glVertexAttribPointer(mP010_vPosition, 2, GLES20.GL_FLOAT, false, 0, mOffscreenVertexBuffer);
