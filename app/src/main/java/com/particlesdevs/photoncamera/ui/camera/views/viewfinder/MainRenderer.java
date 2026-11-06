@@ -1219,14 +1219,24 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glViewport(0, 0, width, height);
                 GLES20.glUseProgram(mP010ToF16Program);
 
+                Matrix.setIdentityM(mOffscreenRotationMatrix, 0);
+                GLES20.glUniformMatrix4fv(uOffscreenTexRotateMatrixHandle_P010, 1, false, mOffscreenRotationMatrix, 0);
+
                 GLES20.glUniform1i(mP010_Ytex, 0);
                 GLES20.glUniform1i(mP010_Utex, 1);
                 GLES20.glUniform1i(mP010_Vtex, 1);
 
-                pVertex.position(0);
-                GLES20.glVertexAttribPointer(mP010_vPosition, 2, GLES20.GL_FLOAT, false, 8, pVertex);
+                mOffscreenVertexBuffer.position(0);
+                GLES20.glVertexAttribPointer(mP010_vPosition, 2, GLES20.GL_FLOAT, false, 0, mOffscreenVertexBuffer);
                 GLES20.glEnableVertexAttribArray(mP010_vPosition);
+
+                mOffscreenTexCoordBuffer.position(0);
+                GLES20.glVertexAttribPointer(mP010_aTexCoord, 2, GLES20.GL_FLOAT, false, 0, mOffscreenTexCoordBuffer);
+                GLES20.glEnableVertexAttribArray(mP010_aTexCoord);
+
                 GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+                GLES20.glDisableVertexAttribArray(mP010_vPosition);
+                GLES20.glDisableVertexAttribArray(mP010_aTexCoord);
 
                 Bitmap resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGBA_F16);
                 boolean readOk = Allocator.readPixelsToBitmap(resultBitmap, width, height);
