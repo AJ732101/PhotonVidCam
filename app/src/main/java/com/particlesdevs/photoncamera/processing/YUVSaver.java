@@ -123,7 +123,9 @@ public class YUVSaver extends DefaultSaver{
                 } else {
                     success = ImageSaver.Util.saveBitmapAsJpg(storagePath, originalBitmap, PhotonCamera.getSettings().singleFrameQuality, exifData);
                 }
-                originalBitmap.recycle();
+                if (originalBitmap != null) {
+                    originalBitmap.recycle();
+                }
                 processingEventsListener.onProcessingFinished("LUT processed JPEG: " + storagePath.toAbsolutePath().toString());
                 return;
             }
@@ -174,7 +176,9 @@ public class YUVSaver extends DefaultSaver{
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-                originalBitmap.recycle();
+                if (originalBitmap != null) {
+                    originalBitmap.recycle();
+                }
                 image.close();
                 processingEventsListener.onProcessingFinished("PNG saved: " + storagePath.toAbsolutePath().toString());
                 return;
@@ -231,7 +235,9 @@ public class YUVSaver extends DefaultSaver{
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-                originalBitmap.recycle();
+                if (originalBitmap != null) {
+                    originalBitmap.recycle();
+                }
                 image.close();
                 processingEventsListener.onProcessingFinished("WebP saved: " + storagePath.toAbsolutePath().toString());
                 return;

@@ -1159,6 +1159,12 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             GLES20.glGenTextures(2, yuvTextures, 0);
 
             try {
+                int[] maxTexSize = new int[1];
+                GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTexSize, 0);
+                if (width > maxTexSize[0] || height > maxTexSize[0]) {
+                    Log.e(TAG, "Image dimensions " + width + "x" + height + " exceed GL_MAX_TEXTURE_SIZE (" + maxTexSize[0] + ")");
+                }
+
                 GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 2);
 
                 GLES30.glPixelStorei(GLES30.GL_UNPACK_ROW_LENGTH, yRowStride / 2);
@@ -1196,7 +1202,9 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 resultBitmap.copyPixelsFromBuffer(processedBuffer);
 
                 return resultBitmap;
-
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw e;
             } finally {
                 GLES20.glDeleteTextures(2, yuvTextures, 0);
                 GLES20.glDeleteFramebuffers(1, fboId, 0);

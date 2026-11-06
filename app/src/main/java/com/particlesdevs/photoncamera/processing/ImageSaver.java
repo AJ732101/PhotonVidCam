@@ -29,6 +29,7 @@ import android.media.MediaScannerConnection;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.widget.Toast;
 
 import com.particlesdevs.photoncamera.api.CameraEventsListener;
 import com.particlesdevs.photoncamera.app.ContextProvider;
@@ -62,6 +63,7 @@ import com.particlesdevs.photoncamera.pro.SpecificSetting;
 import com.particlesdevs.photoncamera.settings.TunableInjector;
 import com.particlesdevs.photoncamera.util.Utilities;
 
+import static com.particlesdevs.photoncamera.app.ContextProvider.getContext;
 import static com.particlesdevs.photoncamera.processing.ImageSaverSelector.getImageSaver;
 import static com.particlesdevs.photoncamera.processing.ImageSaverSelector.init;
 
@@ -538,6 +540,10 @@ public class ImageSaver {
         }
 
         public static boolean saveBitmapAsJpg(Path fileToSave, Bitmap img, int jpgQuality, ParseExif.ExifData exifData) {
+            if (img == null) {
+                Toast.makeText(getContext(), "Null Bitmap -> JPEG", Toast.LENGTH_SHORT).show();
+                return false;
+            }
             Log.d(TAG, "saveBitmapAsJpg() - Bit depth: " + img.getConfig());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && img.getColorSpace() != null) {
                 Log.d(TAG, "saveBitmapAsJpg() - Color space: " + img.getColorSpace().getName());
@@ -605,7 +611,7 @@ public class ImageSaver {
                     }
                 }
                 inter.saveAttributes();
-                MediaScannerConnection.scanFile(ContextProvider.getContext(),
+                MediaScannerConnection.scanFile(getContext(),
                         new String[]{fileToSave.toFile().getAbsolutePath()},
                         new String[]{"image/webp"}, null);
                 return true;
@@ -632,7 +638,7 @@ public class ImageSaver {
                     }
                 }
                 inter.saveAttributes();
-                MediaScannerConnection.scanFile(ContextProvider.getContext(),
+                MediaScannerConnection.scanFile(getContext(),
                         new String[]{fileToSave.toFile().getAbsolutePath()},
                         new String[]{"image/png"}, null);
                 return true;
@@ -737,7 +743,7 @@ public class ImageSaver {
                 dngCreator.writeBuffer(outputStream, buffer, parameters.rawSize.x, parameters.rawSize.y);
                 outputStream.close();
 
-                MediaScannerConnection.scanFile(ContextProvider.getContext(),
+                MediaScannerConnection.scanFile(getContext(),
                         new String[]{dngFilePath.toFile().getAbsolutePath()},
                         new String[]{"image/dng"}, null);
             } catch (IOException e) {
