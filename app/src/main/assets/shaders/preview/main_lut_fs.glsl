@@ -6,6 +6,7 @@ uniform samplerExternalOES sTexture;
 uniform sampler2D          PostLut;
 uniform float              POSTLUTSIZE;
 uniform float              POSTLUTSIZETILES;
+uniform float              uGamma;
 
 out vec4 Output;
 
@@ -41,6 +42,9 @@ vec3 applyLut(in vec3 textureColor) {
 
 void main() {
     vec3 color = texture(sTexture, texCoord).rgb;
+    if (uGamma > 0.0) {
+        color = pow(color, vec3(1.0 / uGamma));
+    }
     vec3 finalColor = applyLut(color);
     Output = vec4(finalColor, 1.0);
 }

@@ -16,10 +16,10 @@ void main() {
     float u_10bit = float(uv_raw.r >> 6);
     float v_10bit = float(uv_raw.g >> 6);
 
-    // Full Range 10-bit normalization
-    float y_prime = y_10bit / 1023.0;
-    float cb_prime = (u_10bit - 512.0) / 1023.0;
-    float cr_prime = (v_10bit - 512.0) / 1023.0;
+    // Limited Range (Studio Swing: 64..940 for Y, 64..960 for UV) 10-bit normalization
+    float y_prime = (y_10bit - 64.0) / 876.0;
+    float cb_prime = (u_10bit - 512.0) / 896.0;
+    float cr_prime = (v_10bit - 512.0) / 896.0;
 
     // BT.2020 Full Range Matrix
     // Often used as the container matrix for 10-bit WCG/HDR data on Android

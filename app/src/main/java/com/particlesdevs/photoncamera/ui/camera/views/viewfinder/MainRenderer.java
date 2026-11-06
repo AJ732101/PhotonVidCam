@@ -73,6 +73,8 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
     private int uBinning_Normal;
     private int uCameraResolution_Normal;
     private int uGamma_Normal;
+    private int uGamma_Lut;
+    private int mYuv_Gamma;
     private int mScreenWidth;
     private int mScreenHeight;
     private int mCameraWidth = 1920;
@@ -197,6 +199,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             float postLutSizeVal = (float) (lutSizeDouble / postLutSizeTilesVal);
             GLES20.glUniform1f(uPostLutSize, postLutSizeVal);
             GLES20.glUniform1f(uPostLutSizeTiles, postLutSizeTilesVal);
+            GLES20.glUniform1f(uGamma_Lut, PhotonCamera.getSettings().gammaValue);
         }
         GLES20.glUniformMatrix4fv(uTexRotateMatrixHandle, 1, false, mTexRotateMatrix, 0);
         GLES20.glUniformMatrix4fv(uSTMatrixHandle, 1, false, mSTMatrix, 0);
@@ -382,6 +385,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         uPostLutSize = GLES20.glGetUniformLocation(mLutProgram, "POSTLUTSIZE");
         uPostLutSizeTiles = GLES20.glGetUniformLocation(mLutProgram, "POSTLUTSIZETILES");
         uOffscreenTexRotateMatrixHandle_LUT = GLES20.glGetUniformLocation(mLutProgram, "uTexRotateMatrix");
+        uGamma_Lut = GLES20.glGetUniformLocation(mLutProgram, "uGamma");
 
         String fss_lut_noclamp ="";
         File fss_lut_noclampFile = new File(sPHOTON_TUNING_DIR, "main_lut_noclamp_2d_fs.glsl");
@@ -570,6 +574,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
         mYTextureHandle = GLES20.glGetUniformLocation(mYuvToRgbProgram, "y_texture");
         mUTextureHandle = GLES20.glGetUniformLocation(mYuvToRgbProgram, "u_texture");
         mVTextureHandle = GLES20.glGetUniformLocation(mYuvToRgbProgram, "v_texture");
+        mYuv_Gamma = GLES20.glGetUniformLocation(mYuvToRgbProgram, "uGamma");
         uOffscreenTexRotateMatrixHandle_YUV = GLES20.glGetUniformLocation(mYuvToRgbProgram, "uTexRotateMatrix");
         uOffscreenTexRotateMatrixHandle_LUT = GLES20.glGetUniformLocation(mLutProgram, "uTexRotateMatrix");
 
@@ -684,6 +689,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
             GLES20.glUniform1i(mYTextureHandle, 0);
             GLES20.glUniform1i(mUTextureHandle, 1);
             GLES20.glUniform1i(mVTextureHandle, 2);
+            GLES20.glUniform1f(mYuv_Gamma, PhotonCamera.getSettings().gammaValue);
 
             mOffscreenVertexBuffer.position(0);
             GLES20.glVertexAttribPointer(mYuvPositionHandle, 2, GLES20.GL_FLOAT, false, 0, mOffscreenVertexBuffer);
@@ -1245,6 +1251,7 @@ public class MainRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFr
                 GLES20.glDisableVertexAttribArray(mP010_vPosition);
                 GLES20.glDisableVertexAttribArray(mP010_aTexCoord);
 
+                //Bitmap resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGBA_F16, true, getTargetColorSpace());
                 Bitmap resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGBA_F16);
                 boolean readOk = Allocator.readPixelsToBitmap(resultBitmap, width, height);
                 if (!readOk) {

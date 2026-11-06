@@ -463,7 +463,9 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                     mMetaData.putString("completeCaptureResult", mLastCaptureResult);
                 }
 
-                if (!PhotonCamera.getSettings().lutName.equals("lut.png") && (!PhotonCamera.isSingleShotJpegOrHeic() || isSingleShotSwEncoder()) && !PhotonCamera.getSettings().selectedMode.equals(CameraMode.VIDEO) && !PhotonCamera.getSettings().selectedMode.equals(CameraMode.RAWVIDEO)) {
+                if (!PhotonCamera.getSettings().lutName.equals("lut.png") &&
+                        (!PhotonCamera.isSingleShotJpegOrHeic() || (isSingleShotSwEncoder() && (PhotonCamera.getSettings().realPreviewFormat != ImageFormat.PRIVATE))) &&
+                        !PhotonCamera.getSettings().selectedMode.equals(CameraMode.VIDEO) && !PhotonCamera.getSettings().selectedMode.equals(CameraMode.RAWVIDEO)) {
                     processImageWithLutAndSave(reader);
                 } else {
                     try {
