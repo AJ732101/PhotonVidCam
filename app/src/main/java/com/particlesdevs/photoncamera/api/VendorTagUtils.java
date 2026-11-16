@@ -51,6 +51,16 @@ public class VendorTagUtils {
         return supported;
     }
 
+    @SuppressLint("NewApi")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void setPhysical(CaptureRequest.Builder builder, CaptureRequest.Key key, Object value, String physicalId) {
+        try {
+            builder.setPhysicalCameraKey(key, value, physicalId);
+        } catch (Exception e) {
+            Log.w(TAG, "Error setting physical camera key: " + key.getName() + " for camera: " + physicalId, e);
+        }
+    }
+
     public static List<String> getSupportedIso(CameraCharacteristics cameraCharacteristics) {
         KEY_ISO_INDEX.clear();
         KEY_ISO_INDEX.put("auto", 0);
@@ -203,7 +213,7 @@ public class VendorTagUtils {
     }
 
     @SuppressLint({"NewApi", "LocalSuppress"})
-    public static void builderSessionApply(CameraCharacteristics cameraCharacteristics, CaptureRequest.Builder builder, boolean burst, boolean useMaximumResolutionKey, boolean isPreview) {
+    public static void builderSessionApply(CameraCharacteristics cameraCharacteristics, CaptureRequest.Builder builder, boolean burst, boolean useMaximumResolutionKey, boolean isPreview, String physicalCameraId) {
         try {
             PhotonCamera.isSamsung = Build.BRAND.equalsIgnoreCase("samsung");
             PhotonCamera.isGoogle = Build.BRAND.equalsIgnoreCase("google");
@@ -1203,16 +1213,31 @@ public class VendorTagUtils {
                 var clientName = new CaptureRequest.Key<>("com.xiaomi.sessionparams.clientName", String.class);
                 if (isSupported(builder, clientName)) {
                     builder.set(clientName, "com.android.camera");
+                    //builder.set(clientName, "com.xiaomi.module.evaluation");
+                    setPhysical(builder, clientName, "com.android.camera", physicalCameraId);
+                }
+                var appModuleKey = new CaptureRequest.Key<>("xiaomi.app.module", int[].class);
+                if (isSupported(builder, appModuleKey)) {
+                    //builder.set(appModuleKey, new int[]{167});
+                    //setPhysical(builder, appModuleKey, new int[]{167}, physicalCameraId);
+                    builder.set(appModuleKey, new int[]{65535});
+                    setPhysical(builder, appModuleKey, new int[]{65535}, physicalCameraId);
                 }
                 if (burst) {
                     var remosaicEnabled = new CaptureRequest.Key<>("xiaomi.remosaic.enabled", Byte.class);
                     if (isSupported(builder, remosaicEnabled)) {
                         builder.set(remosaicEnabled, (byte) 1);
+                        setPhysical(builder, remosaicEnabled, (byte) 1, physicalCameraId);
                     }
-
+                    var remosaicQuadEnabled = new CaptureRequest.Key<>("xiaomi.quadcfa.enabled", Byte.class);
+                    if (isSupported(builder, remosaicQuadEnabled)) {
+                        builder.set(remosaicQuadEnabled, (byte) 1);
+                        setPhysical(builder, remosaicQuadEnabled, (byte) 1, physicalCameraId);
+                    }
                     var remosaicEnabled2 = new CaptureRequest.Key<>("com.mediatek.control.capture.remosaicenable", int[].class);
                     if (isSupported(builder, remosaicEnabled2)) {
                         builder.set(remosaicEnabled2, new int[]{1});
+                        setPhysical(builder, remosaicEnabled2, (byte) 1, physicalCameraId);
                     }
                 }
             }

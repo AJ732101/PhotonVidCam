@@ -60,7 +60,7 @@ android {
 
 
     defaultConfig {
-        applicationId 'com.xiaomi.module.evaluation'
+        applicationId 'com.particlesdevs.photonvidcam'
         minSdk 29
         targetSdk 37
         versionCode versionBuild

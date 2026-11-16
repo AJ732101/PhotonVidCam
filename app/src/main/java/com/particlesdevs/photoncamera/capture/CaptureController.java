@@ -382,7 +382,9 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
         public void onImageAvailable(ImageReader reader) {
             if (isZslMode()) {
                 Image img = reader.acquireNextImage();
-                if (img == null) return;
+                if (img == null) {
+                    return;
+                }
                 if (mZslCapturing) {
                     img.close();
                     return;
@@ -1686,21 +1688,41 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 long flags = HardwareBuffer.USAGE_CPU_READ_OFTEN;
                 if (mTargetFormat == ImageFormat.JPEG_R) {
-                    flags = HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_COMPOSER_OVERLAY;
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
+                    }
                 } else if (mTargetFormat == ImageFormat.YCBCR_P010) {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
-                        flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_VIDEO_ENCODE;
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_VIDEO_ENCODE;
+                        flags = 0x00100000;
                     }
+
                 } else if (mTargetFormat == ImageFormat.RAW_SENSOR) {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
-                        flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
+                    }
+                } else if (mTargetFormat == ImageFormat.HEIC) {
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
+                    }
+                } else if (mTargetFormat == ImageFormat.JPEG) {
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
                     }
                 } else if (mTargetFormat == ImageFormat.YUV_420_888) {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
-                        flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
                     }
                 } else if (mTargetFormat == ImageFormat.PRIVATE) {
-                    flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
+                    }
                 }
                 mImageReaderRaw = new ImageReader.Builder(targetWidth, targetHeight)
                         .setMaxImages(maxImageReaderImages)
@@ -1708,6 +1730,16 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                         //.setDefaultDataSpace(DataSpace.DATASPACE_BT2020_HLG)
                         .setUsage(flags)
                         .build();
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                long flags = HardwareBuffer.USAGE_CPU_READ_OFTEN;
+                if (mTargetFormat == ImageFormat.PRIVATE || (PhotonCamera.getSettings().alternateImageReaderFlags && (mTargetFormat == ImageFormat.YUV_420_888 || mTargetFormat == ImageFormat.RAW_SENSOR))) {
+                    //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN;
+                    if (PhotonCamera.getSettings().alternateImageReaderFlags) {
+                        //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
+                        flags = 0x00100000;
+                    }
+                }
+                mImageReaderRaw = ImageReader.newInstance(targetWidth, targetHeight, mTargetFormat, maxImageReaderImages, flags);
             } else {
                 mImageReaderRaw = ImageReader.newInstance(targetWidth, targetHeight, mTargetFormat, maxImageReaderImages);
             }
@@ -2759,7 +2791,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                             resetPreviewAEMode();
                         }
                         Camera2ApiAutoFix.applyPrev(mPreviewRequestBuilder);
-                        VendorTagUtils.builderSessionApply(mCameraCharacteristics, mPreviewRequestBuilder, false, useMaximumResolutionKey, true);
+                        VendorTagUtils.builderSessionApply(mCameraCharacteristics, mPreviewRequestBuilder, false, useMaximumResolutionKey, true, physicalID);
                         // Finally, we start displaying the camera preview.
                         Range<Integer> targetRange = FpsRangeDef;
                         if (PhotonCamera.getSettings().videoFramrate >= 120 && !mIsRecordingVideo) {
@@ -2869,7 +2901,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                 }
 
                 if (PhotonCamera.getSettings().earlyVendorKeysLoading) {
-                    VendorTagUtils.builderSessionApply(mCameraCharacteristics, mPreviewRequestBuilder, true, useMaximumResolutionKey, true);
+                    VendorTagUtils.builderSessionApply(mCameraCharacteristics, mPreviewRequestBuilder, true, useMaximumResolutionKey, true, physicalID);
                 }
 
                 if (configuration != null) {
@@ -3940,7 +3972,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
-        VendorTagUtils.builderSessionApply(mCameraCharacteristics, captureBuilder, false, useMaximumResolutionKey, false);
+        VendorTagUtils.builderSessionApply(mCameraCharacteristics, captureBuilder, false, useMaximumResolutionKey, false, physicalID);
 
         setDigitalZoomFactor(captureBuilder);
 
@@ -4697,7 +4729,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
             }
             Log.d(TAG, "CaptureBuilderStarted!");
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, PhotonCamera.getGravity().getCameraRotation(mSensorOrientation));
-            VendorTagUtils.builderSessionApply(mCameraCharacteristics, captureBuilder, true, useMaximumResolutionKey, false);
+            VendorTagUtils.builderSessionApply(mCameraCharacteristics, captureBuilder, true, useMaximumResolutionKey, false, physicalID);
             //captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, mPreviewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION));
             captures = new ArrayList<>();
             BurstShakiness = new ArrayList<>();

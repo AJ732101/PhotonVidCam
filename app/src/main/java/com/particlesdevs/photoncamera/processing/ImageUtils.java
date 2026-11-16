@@ -19,10 +19,13 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.HandlerThread;
 import androidx.annotation.RequiresApi;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+
+import org.chickenhook.restrictionbypass.RestrictionBypass;
 
 import com.particlesdevs.photoncamera.app.PhotonCamera;
 import com.particlesdevs.photoncamera.ui.camera.views.viewfinder.MainRenderer;
@@ -230,6 +233,10 @@ public class ImageUtils {
             return privateBitToBitmap(image);
         }
 
+        return yuv8BitToBitmapCpu(image);
+    }
+
+    private static Bitmap yuv8BitToBitmapCpu(Image image) {
         int width = image.getWidth();
         int height = image.getHeight();
         Image.Plane[] planes = image.getPlanes();
@@ -312,6 +319,26 @@ public class ImageUtils {
         }
     }
 
+    private static Bitmap safeWrapHardwareBuffer(HardwareBuffer inputBuffer, ColorSpace colorSpace) {
+        try {
+            return Bitmap.wrapHardwareBuffer(inputBuffer, colorSpace);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Bitmap.wrapHardwareBuffer failed (missing USAGE_GPU_SAMPLED_IMAGE?), attempting mUsage reflection fallback: " + e.getMessage());
+            try {
+                java.lang.reflect.Field usageField = RestrictionBypass.getDeclaredField(HardwareBuffer.class, "mUsage");
+                if (usageField != null) {
+                    usageField.setAccessible(true);
+                    long currentUsage = usageField.getLong(inputBuffer);
+                    usageField.setLong(inputBuffer, currentUsage | HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE);
+                    return Bitmap.wrapHardwareBuffer(inputBuffer, colorSpace);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "HardwareBuffer mUsage reflection fallback failed", t);
+            }
+        }
+        return null;
+    }
+
     /**
      * Converts a PRIVATE (8/10-bit) Image to a standard RGBA_F16 Bitmap.
      * Expects an Image originating from an ImageReader created with HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE.
@@ -340,15 +367,22 @@ public class ImageUtils {
         HardwareRenderer renderer = null;
 
         try {
-            ColorSpace colorSpace = null;
+            ColorSpace colorSpace;
             if (image.getFormat() == ImageFormat.PRIVATE) {
-                ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB);
+                colorSpace = ColorSpace.get(ColorSpace.Named.EXTENDED_SRGB);
             } else {
-                ColorSpace.get(ColorSpace.Named.SRGB);
+                colorSpace = ColorSpace.get(ColorSpace.Named.SRGB);
             }
-            inputHardwareBitmap = Bitmap.wrapHardwareBuffer(inputBuffer, colorSpace);
+
+            inputHardwareBitmap = safeWrapHardwareBuffer(inputBuffer, colorSpace);
+
             if (inputHardwareBitmap == null) {
-                throw new IllegalStateException("Failed to wrap input HardwareBuffer into Bitmap");
+                Log.e(TAG, "Failed to wrap input HardwareBuffer into Bitmap even with reflection fallback");
+                if (image.getFormat() == ImageFormat.YUV_420_888) {
+                    Log.i(TAG, "Falling back to CPU YUV conversion");
+                    return yuv8BitToBitmapCpu(image);
+                }
+                return null;
             }
 
             BitmapShader shader = new BitmapShader(inputHardwareBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
