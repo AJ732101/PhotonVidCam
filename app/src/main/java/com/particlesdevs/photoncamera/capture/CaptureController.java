@@ -1242,6 +1242,24 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
         } finally {
             mCameraOpenCloseLock.release();
         }
+
+        try {
+            Class<?> vivoManagerClass = Class.forName("android.hardware.vivocamera.VivoCameraManager");
+            Method getInstanceMethod = vivoManagerClass.getMethod("getInstance");
+            Object managerInstance = getInstanceMethod.invoke(null);
+            Method setValueMethod = vivoManagerClass.getMethod("setValue", int.class, int.class);
+            if ((setValueMethod != null) && (managerInstance != null)) {
+                setValueMethod.invoke(managerInstance, 40, 0);
+                boolean useVcf = true;
+                if (useVcf) {
+                    setValueMethod.invoke(managerInstance, 33, 2);
+                }
+                Thread.sleep(100);
+                android.util.Log.d(TAG, "VivoCameraManager state released / restored");
+            }
+        } catch (Exception e) {
+            android.util.Log.d(TAG, "Failed to release Vivo Vendor Gate");
+        }
     }
 
     /**
@@ -1697,7 +1715,6 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                         //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_VIDEO_ENCODE;
                         flags = 0x00100000;
                     }
-
                 } else if (mTargetFormat == ImageFormat.RAW_SENSOR) {
                     if (PhotonCamera.getSettings().alternateImageReaderFlags) {
                         //flags = HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE;
@@ -1910,6 +1927,31 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
      * Opens the camera specified by {@link Settings#mCameraID}.
      */
     public void openCamera(int width, int height) {
+        try {
+            Class<?> vivoManagerClass = Class.forName("android.hardware.vivocamera.VivoCameraManager");
+            Method getInstanceMethod = vivoManagerClass.getMethod("getInstance");
+            Object managerInstance = getInstanceMethod.invoke(null);
+            Method getInfoMethod = vivoManagerClass.getMethod("getInfo", int.class);
+            Method setValueMethod = vivoManagerClass.getMethod("setValue", int.class, int.class);
+            if ((getInfoMethod != null) && (managerInstance != null)) {
+                int appType = (int) getInfoMethod.invoke(managerInstance, 1);
+                int vcfAppType = (int) getInfoMethod.invoke(managerInstance, 33);
+                int useVivoCamera = (int) getInfoMethod.invoke(managerInstance, 40);
+                android.util.Log.d(TAG, "Current VivoCameraManager state BEFORE Vendor Gate executed: appType=" + appType + " - vcfAppType=" + vcfAppType + " - useVivoCamera=" + useVivoCamera);
+                boolean useVcf = true;
+                if (useVcf) {
+                    setValueMethod.invoke(managerInstance, 33, 2);
+                }
+                setValueMethod.invoke(managerInstance, 40, 1);
+                Thread.sleep(100);
+                vcfAppType = (int) getInfoMethod.invoke(managerInstance, 33);
+                useVivoCamera = (int) getInfoMethod.invoke(managerInstance, 40);
+                android.util.Log.d(TAG, "Current VivoCameraManager state AFTER Vendor Gate executed: appType=" + appType + " - vcfAppType=" + vcfAppType + " - useVivoCamera=" + useVivoCamera);
+            }
+        } catch (Exception e) {
+            android.util.Log.d(TAG, "No Vivo Vendor Gate found");
+        }
+
         //Open camera in non ui thread
         processExecutor.execute(()->{
             CameraFragment.mSelectedMode = PhotonCamera.getSettings().selectedMode;
@@ -2904,8 +2946,11 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                     VendorTagUtils.builderSessionApply(mCameraCharacteristics, mPreviewRequestBuilder, true, useMaximumResolutionKey, true, physicalID);
                 }
 
+                CaptureRequest.Builder sessionParamsBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+                VendorTagUtils.builderSessionApply(mCameraCharacteristics, sessionParamsBuilder, true, useMaximumResolutionKey, true, physicalID);
+
                 if (configuration != null) {
-                    configuration.setSessionParameters(mPreviewRequestBuilder.build());
+                    configuration.setSessionParameters(sessionParamsBuilder.build());
                     mCameraDevice.createCaptureSession(configuration);
                 }
             } else {
@@ -6452,6 +6497,8 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
         final Map<String, Integer> maxBitrates = new HashMap<>();
         final Map<String, Boolean> hwSupports = new HashMap<>();
         final Map<String, String> encoderNames = new HashMap<>();
+        final Map<String, Integer> highestProfile = new HashMap<>();
+        final Map<String, Integer> highestLevel = new HashMap<>();
 
         public EncoderInfoUtil() {
             mimeTypes.add(MediaFormat.MIMETYPE_VIDEO_AVC);
@@ -6461,6 +6508,7 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
             mimeTypes.add(MediaFormat.MIMETYPE_VIDEO_VP9);
             mimeTypes.add(MediaFormat.MIMETYPE_VIDEO_AV1);
             mimeTypes.add(MediaFormat.MIMETYPE_VIDEO_APV);
+            mimeTypes.add(MediaFormat.MIMETYPE_IMAGE_ANDROID_HEIC);
         }
 
         public void getEncoderInfos() {maxResolutions.clear();
@@ -6506,6 +6554,19 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                             maxBitrates.put(mimeType, videoCaps.getBitrateRange().getUpper());
                             hwSupports.put(mimeType, bestIsHardware);
                             encoderNames.put(mimeType, bestCodec.getName());
+
+                            int maxProfile = -1;
+                            int maxLevel = -1;
+                            for (MediaCodecInfo.CodecProfileLevel pl : caps.profileLevels) {
+                                if (pl.profile > maxProfile) {
+                                    maxProfile = pl.profile;
+                                }
+                                if (pl.level > maxLevel) {
+                                    maxLevel = pl.level;
+                                }
+                            }
+                            highestProfile.put(mimeType, maxProfile);
+                            highestLevel.put(mimeType, maxLevel);
                         }
                     } catch (Exception e) {
 
@@ -6518,13 +6579,16 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
                 Size resolution = maxResolutions.get(mimeType);
                 Integer bitrate = maxBitrates.get(mimeType);
                 Boolean hwSupport = hwSupports.get(mimeType);
+                Integer maxProfile = highestProfile.get(mimeType);
+                Integer maxLevel = highestLevel.get(mimeType);
 
                 // Baue den Log-String zusammen
                 String logMessage = "VideoEncoderName: " + name +
                         " - mimeType: " + mimeType +
                         " - max encoder resolution: " + (resolution != null ? resolution.toString() : "N/A") +
                         " - max bitrate: " + (bitrate != null ? (bitrate / (1024 * 1024)) + "MBit/s" : "N/A") +
-                        " - HW supported: " + (hwSupport != null ? hwSupport.toString() : "N/A");
+                        " - max profile: " + maxProfile +
+                        " - max level: " + maxLevel;
 
                 Log.d(TAG, logMessage);
             }
@@ -6539,6 +6603,14 @@ public class CaptureController implements MediaRecorder.OnInfoListener {
 
         public String getEncoderNameForMimeType(String mimeType) {
             return encoderNames.get(mimeType);
+        }
+
+        public Integer getHighestProfileForMimeType(String mimeType) {
+            return highestProfile.get(mimeType);
+        }
+
+        public Integer getHighestLevelForMimeType(String mimeType) {
+            return highestLevel.get(mimeType);
         }
 
         public Boolean getHwSupportForMimeType(String mimeType) {

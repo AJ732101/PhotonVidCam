@@ -3,6 +3,7 @@ package com.particlesdevs.photoncamera.processing.processor;
 import android.annotation.SuppressLint;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
@@ -161,6 +162,9 @@ public class RawVideoProcessor extends ProcessorBase {
             exifData.IMAGE_DESCRIPTION = parameters.toString();
             fillParams = true;
             dngCreator = new DngCreator();
+            if (PhotonCamera.getSettings().QuadBayer) {
+                parameters.sensorPix = new Rect(0, 0, parameters.rawSize.x, parameters.rawSize.y);
+            }
             dngCreator.setParameters(parameters);
             dngCreator.setBinning(PreferenceKeys.isRawVideoDownscale4x());
             dngCreator.setFrameRate(resolveFrameRate());

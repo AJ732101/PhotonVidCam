@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import com.particlesdevs.photoncamera.api.ParseExif;
 import com.particlesdevs.photoncamera.app.ContextProvider;
 import com.particlesdevs.photoncamera.app.PhotonCamera;
+import com.particlesdevs.photoncamera.capture.CaptureController;
 import com.particlesdevs.photoncamera.ui.camera.views.viewfinder.MainRenderer;
 import com.particlesdevs.photoncamera.util.Log;
 import com.particlesdevs.photoncamera.util.Utilities;
@@ -471,7 +472,7 @@ public class YUVSaver extends DefaultSaver{
                 }
 
                 Log.d(TAG, "Successfully saved HEIC/AVIF/APV still image to: " + heicFile.getAbsolutePath());
-                processingEventsListener.onProcessingFinished("HEIC/AVIF/APV saved: " + heicFile.getAbsolutePath());
+                processingEventsListener.onProcessingFinished(mimeVid + " " + heicFile.getAbsolutePath());
             } catch (Exception e) {
                 Log.e(TAG, "Failed during HEIC/AVIF/APV encoding process", e);
                 processingEventsListener.onProcessingError("HEIC/AVIF/APV encoding failed: " + e.getMessage());
@@ -638,7 +639,7 @@ public class YUVSaver extends DefaultSaver{
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
         };
         format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ);
-        format.setInteger(MediaFormat.KEY_QUALITY, PhotonCamera.getSettings().singleFrameQuality);
+        format.setInteger(MediaFormat.KEY_QUALITY, 2 * PhotonCamera.getSettings().singleFrameQuality);
         format.setInteger(MediaFormat.KEY_FRAME_RATE, 1);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
         format.setInteger(MediaFormat.KEY_IS_DEFAULT, 1);
@@ -653,7 +654,10 @@ public class YUVSaver extends DefaultSaver{
             if (yuvFormat == ImageFormat.YCBCR_P010) {
                 format.setInteger(MediaFormat.KEY_COLOR_STANDARD, PhotonCamera.getSettings().photoColorSpace);
                 format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, PhotonCamera.getSettings().photoTransferFunction);
-                format.setInteger(MediaFormat.KEY_PROFILE, 0x8);
+                CaptureController.EncoderInfoUtil encoderInfo = new CaptureController.EncoderInfoUtil();
+                encoderInfo.getEncoderInfos();
+                Integer highestProfile = encoderInfo.getHighestProfileForMimeType(MediaFormat.MIMETYPE_IMAGE_ANDROID_HEIC);
+                format.setInteger(MediaFormat.KEY_PROFILE, highestProfile);
                 format.setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel62);
             } else {
                 format.setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709);

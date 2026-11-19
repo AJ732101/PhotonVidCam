@@ -734,6 +734,9 @@ public class ImageSaver {
 
         public static boolean saveSingleRaw(Path dngFilePath, ByteBuffer buffer, Parameters parameters) {
             DngCreator dngCreator = new DngCreator();
+            if (PhotonCamera.getSettings().QuadBayer) {
+                parameters.sensorPix = new Rect(0, 0, parameters.rawSize.x, parameters.rawSize.y);
+            }
             dngCreator.setParameters(parameters);
             dngCreator.setCompression(PhotonCamera.getSettings().useDngCompression);
 

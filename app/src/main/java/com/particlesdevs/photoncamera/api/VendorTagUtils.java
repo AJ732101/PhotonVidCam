@@ -231,6 +231,12 @@ public class VendorTagUtils {
 
         resetFlags();
 
+        var vivoSendorMode = new CaptureRequest.Key<>("vivo.control.forceSensorMode", Integer.class);
+        if (isSupported(builder, vivoSendorMode) && PhotonCamera.getSettings().QuadBayer && (PhotonCamera.getSettings().sensorMode != -1)) {
+            builder.set(vivoSendorMode, PhotonCamera.getSettings().sensorMode);
+            setPhysical(builder, vivoSendorMode, PhotonCamera.getSettings().sensorMode, physicalCameraId);
+        }
+
         try {
             if (!PhotonCamera.getSettings().disableVendorKeys) {
                 var demosaicMode = new CaptureRequest.Key<>("android.demosaic.mode", Byte.class);

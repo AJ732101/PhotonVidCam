@@ -1205,7 +1205,13 @@ public class CameraFragment extends Fragment implements BaseActivity.BackPressed
                 String webpPrefix = "WebP saved: ";
                 String undefinedPrefix = "HEIC/AVIF/APV saved: ";
 
-                if (message.startsWith(jpegPrefix)) {
+                if (message.startsWith("image/")) {
+                    String[] parts = message.split("\\s+", 2);
+                    if (parts.length == 2) {
+                        mimeType = parts[0]; // "image/vnd.android.heic"
+                        filePath = parts[1];
+                    }
+                } else if (message.startsWith(jpegPrefix)) {
                     filePath = message.substring(jpegPrefix.length());
                     mimeType = "image/jpeg";
                 } else if (message.startsWith(heicPrefix)) {
